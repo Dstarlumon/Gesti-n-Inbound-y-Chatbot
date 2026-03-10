@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión Inbound - Chatbot</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; color: #333; }
+
+        .header {
+            background: linear-gradient(135deg, #1a237e, #283593);
+            color: white; padding: 18px 30px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,.2);
+        }
+        .header h1 { font-size: 1.4rem; font-weight: 600; }
+        .header .status { font-size: .85rem; display: flex; align-items: center; gap: 8px; }
+        .header .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .dot.ok { background: #4caf50; } .dot.err { background: #f44336; }
+
+        .tabs {
+            display: flex; background: #fff; border-bottom: 2px solid #e0e0e0;
+            padding: 0 20px; gap: 0;
+        }
+        .tab {
+            padding: 14px 28px; cursor: pointer; font-weight: 500; font-size: .95rem;
+            border-bottom: 3px solid transparent; transition: all .2s;
+            color: #666;
+        }
+        .tab:hover { color: #1a237e; background: #f5f5ff; }
+        .tab.active { color: #1a237e; border-bottom-color: #1a237e; font-weight: 600; }
+
+        .panel { display: none; padding: 24px; max-width: 1400px; margin: 0 auto; }
+        .panel.active { display: block; }
+
+        /* FORM */
+        .form-card {
+            background: #fff; border-radius: 12px; padding: 28px;
+            box-shadow: 0 1px 6px rgba(0,0,0,.08);
+        }
+        .form-title { font-size: 1.15rem; font-weight: 600; color: #1a237e; margin-bottom: 20px; border-bottom: 2px solid #e8eaf6; padding-bottom: 10px; }
+
+        .form-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 18px;
+        }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: .82rem; font-weight: 600; color: #555; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .5px; }
+        .form-group input, .form-group select, .form-group textarea {
+            padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px;
+            font-size: .93rem; transition: border-color .2s; font-family: inherit;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none; border-color: #3f51b5; box-shadow: 0 0 0 3px rgba(63,81,181,.12);
+        }
+        .form-group input:invalid.touched, .form-group select:invalid.touched, .form-group textarea:invalid.touched {
+            border-color: #c62828; box-shadow: 0 0 0 3px rgba(198,40,40,.12);
+        }
+        .field-error { color: #c62828; font-size: .75rem; margin-top: 3px; display: none; }
+        .field-error.show { display: block; }
+        .form-group.full { grid-column: 1 / -1; }
+        .form-group textarea { resize: vertical; min-height: 70px; }
+
+        .btn-row { display: flex; gap: 12px; margin-top: 22px; justify-content: flex-end; }
+        .btn {
+            padding: 11px 28px; border: none; border-radius: 8px; font-size: .95rem;
+            font-weight: 600; cursor: pointer; transition: all .2s; display: flex; align-items: center; gap: 6px;
+        }
+        .btn-primary { background: #1a237e; color: #fff; }
+        .btn-primary:hover { background: #283593; transform: translateY(-1px); }
+        .btn-primary:disabled { background: #9fa8da; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #e8eaf6; color: #1a237e; }
+        .btn-secondary:hover { background: #c5cae9; }
+        .btn-danger { background: #ffebee; color: #c62828; }
+        .btn-danger:hover { background: #ffcdd2; }
+        .btn-success { background: #e8f5e9; color: #2e7d32; }
+        .btn-success:hover { background: #c8e6c9; }
+
+        /* DASHBOARD */
+        .filters-bar {
+            background: #fff; border-radius: 12px; padding: 18px 24px;
+            box-shadow: 0 1px 6px rgba(0,0,0,.08);
+            display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin-bottom: 20px;
+        }
+        .filter-group { display: flex; flex-direction: column; }
+        .filter-group label { font-size: .78rem; font-weight: 600; color: #666; margin-bottom: 4px; text-transform: uppercase; }
+        .filter-group input, .filter-group select {
+            padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: .88rem;
+        }
+
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .stat-card {
+            background: #fff; border-radius: 12px; padding: 18px;
+            box-shadow: 0 1px 6px rgba(0,0,0,.08); text-align: center;
+        }
+        .stat-card .number { font-size: 2rem; font-weight: 700; color: #1a237e; }
+        .stat-card .label { font-size: .82rem; color: #888; margin-top: 4px; }
+
+        .table-card {
+            background: #fff; border-radius: 12px; overflow: hidden;
+            box-shadow: 0 1px 6px rgba(0,0,0,.08);
+        }
+        .table-header { padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; }
+        .table-header h3 { font-size: 1rem; color: #1a237e; }
+
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+        thead { background: #f5f5ff; }
+        th { padding: 12px 14px; text-align: left; font-weight: 600; color: #444; white-space: nowrap; border-bottom: 2px solid #e0e0e0; }
+        td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; }
+        tr:hover td { background: #fafafe; }
+        td.actions { white-space: nowrap; }
+        .badge {
+            display: inline-block; padding: 3px 10px; border-radius: 12px;
+            font-size: .78rem; font-weight: 600;
+        }
+        .badge-green { background: #e8f5e9; color: #2e7d32; }
+        .badge-blue { background: #e3f2fd; color: #1565c0; }
+        .badge-orange { background: #fff3e0; color: #e65100; }
+        .badge-red { background: #ffebee; color: #c62828; }
+
+        .empty-state { padding: 60px 20px; text-align: center; color: #999; }
+        .empty-state svg { width: 60px; height: 60px; margin-bottom: 16px; opacity: .4; }
+
+        /* CONFIG */
+        .config-card { background: #fff; border-radius: 12px; padding: 28px; box-shadow: 0 1px 6px rgba(0,0,0,.08); margin-bottom: 20px; }
+        .config-card h3 { color: #1a237e; margin-bottom: 12px; }
+        .config-card p { color: #666; line-height: 1.6; margin-bottom: 10px; }
+        .config-card code { background: #f5f5f5; padding: 2px 8px; border-radius: 4px; font-size: .88rem; }
+        .config-card pre {
+            background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px;
+            overflow-x: auto; font-size: .82rem; line-height: 1.5; margin: 10px 0;
+        }
+        .config-input-row { display: flex; gap: 10px; margin-top: 12px; }
+        .config-input-row input { flex: 1; padding: 10px 12px; border: 1.5px solid #ddd; border-radius: 8px; font-size: .9rem; }
+
+        /* Toast */
+        .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+        .toast {
+            padding: 14px 20px; border-radius: 10px; color: #fff; font-size: .9rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,.2); animation: slideIn .3s ease;
+            display: flex; align-items: center; gap: 8px; min-width: 280px;
+        }
+        .toast-success { background: #2e7d32; } .toast-error { background: #c62828; } .toast-info { background: #1565c0; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* Spinner */
+        .spinner { display: inline-block; width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Modal */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 999;
+            justify-content: center; align-items: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal { background: #fff; border-radius: 14px; padding: 28px; max-width: 500px; width: 90%; }
+        .modal h3 { color: #c62828; margin-bottom: 12px; }
+        .modal p { color: #555; margin-bottom: 20px; }
+        .modal .btn-row { justify-content: flex-end; }
+
+        @media (max-width: 768px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .filters-bar { flex-direction: column; }
+            .stats-row { grid-template-columns: 1fr 1fr; }
+            .header { flex-direction: column; gap: 8px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Gestión Inbound - Chatbot / Zurich</h1>
+    <div class="status">
+        <span class="dot" id="connDot"></span>
+        <span id="connText">Verificando conexión...</span>
+    </div>
+</div>
+
+<div class="tabs">
+    <div class="tab active" data-tab="form">Nuevo Registro</div>
+    <div class="tab" data-tab="dashboard">Tablero de Datos</div>
+    <div class="tab" data-tab="config">Configuración</div>
+</div>
+
+<!-- ============ FORMULARIO ============ -->
+<div class="panel active" id="panel-form">
+    <div class="form-card">
+        <div class="form-title">Registro de Gestión</div>
+        <form id="mainForm">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="f_fecha" required>
+                </div>
+                <div class="form-group">
+                    <label>Agente</label>
+                    <select id="f_agente" required>
+                        <option value="">-- Seleccionar --</option>
+                        <option>Johana Soto</option>
+                        <option>Tatiana Pedraza</option>
+                        <option>Marlen Chacón</option>
+                        <option>Paola Rodriguez</option>
+                        <option>Diana Rodriguez</option>
+                        <option>Ana Robledo</option>
+                        <option>Alejandra Londoño</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nombre del Cliente</label>
+                    <input type="text" id="f_nombre" placeholder="Nombre completo" required>
+                </div>
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="tel" id="f_telefono" placeholder="Ej: 3001234567" required>
+                </div>
+                <div class="form-group">
+                    <label>Documento</label>
+                    <input type="text" id="f_documento" placeholder="Cédula o NIT" required>
+                </div>
+                <div class="form-group">
+                    <label>Correo</label>
+                    <input type="email" id="f_correo" placeholder="correo@ejemplo.com" required>
+                </div>
+                <div class="form-group">
+                    <label>Placa</label>
+                    <input type="text" id="f_placa" placeholder="Ej: ABC123" style="text-transform:uppercase;" required>
+                </div>
+                <div class="form-group">
+                    <label>Ciudad</label>
+                    <input type="text" id="f_ciudad" placeholder="Ej: Bogotá" required>
+                </div>
+                <div class="form-group">
+                    <label>Valor Póliza</label>
+                    <input type="text" id="f_valor" placeholder="Ej: 1.500.000" oninput="formatCurrency(this)" required>
+                </div>
+                <div class="form-group">
+                    <label>¿Realizaste Cotización?</label>
+                    <select id="f_cotizacion" required>
+                        <option value="">-- Seleccionar --</option>
+                        <option>Sí</option>
+                        <option>No</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Medio</label>
+                    <select id="f_medio" required>
+                        <option value="">-- Seleccionar --</option>
+                        <option>Intermediario</option>
+                        <option>Directa</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Base</label>
+                    <select id="f_base" required>
+                        <option value="">-- Seleccionar --</option>
+                        <option>In Bound</option>
+                        <option>Chatbot</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Tipificación</label>
+                    <select id="f_tipificacion" required>
+                        <option value="">-- Seleccionar --</option>
+                        <option>Cliente Ya Tiene Seguro Con Zurich Intermediario</option>
+                        <option>Cliente Ya Tiene Seguro Con Zurich Directo</option>
+                        <option>Esta Asesorado Por Un Asesor Zurich</option>
+                        <option>Es Un Intermediario De Zurich</option>
+                        <option>Registro Duplicado</option>
+                        <option>Servicio al cliente</option>
+                        <option>Cliente cuelga - Llamada caida</option>
+                        <option>Datos No Corresponde (Numero De Telefono - Rpl)</option>
+                        <option>No contacto - sin datos</option>
+                        <option>No contesta</option>
+                        <option>En proceso</option>
+                        <option>Pendiente inspeccion</option>
+                        <option>Interesado en otro producto</option>
+                        <option>Contacto Con Tercero</option>
+                        <option>No Esta Interesado En Comprar</option>
+                        <option>Interesado en SOAT</option>
+                        <option>Volver A Llamar</option>
+                        <option>Vendio El Vehiculo</option>
+                        <option>Cliente Informa Que No Se Registro En La Pagina</option>
+                        <option>Mala Experiencia con Zurich</option>
+                        <option>No asegurable por MARCA</option>
+                        <option>no asegurable por POLITICAS</option>
+                        <option>Ya Lo Compro Con Otra Compania</option>
+                        <option>Se decidió Con Otra Compania</option>
+                        <option>Solo Se Encuentra Cotizando</option>
+                        <option>Precio Con Otra Aseguradora</option>
+                        <option>Venta</option>
+                    </select>
+                </div>
+                <div class="form-group full">
+                    <label>Observación</label>
+                    <textarea id="f_observacion" placeholder="Escribe las observaciones de la gestión..." required></textarea>
+                </div>
+            </div>
+            <div class="btn-row">
+                <button type="button" class="btn btn-secondary" onclick="clearForm()">Limpiar</button>
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                    <span id="submitText">Guardar Registro</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ============ TABLERO ============ -->
+<div class="panel" id="panel-dashboard">
+    <div class="filters-bar">
+        <div class="filter-group">
+            <label>Fecha Desde</label>
+            <input type="date" id="fil_desde">
+        </div>
+        <div class="filter-group">
+            <label>Fecha Hasta</label>
+            <input type="date" id="fil_hasta">
+        </div>
+        <div class="filter-group">
+            <label>Agente</label>
+            <select id="fil_agente">
+                <option value="">Todos</option>
+                <option>Johana Soto</option>
+                <option>Tatiana Pedraza</option>
+                <option>Marlen Chacón</option>
+                <option>Paola Rodriguez</option>
+                <option>Diana Rodriguez</option>
+                <option>Ana Robledo</option>
+                <option>Alejandra Londoño</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Tipificación</label>
+            <select id="fil_tipificacion">
+                <option value="">Todas</option>
+                <option>En proceso</option>
+                <option>No contesta</option>
+                <option>Volver A Llamar</option>
+                <option>No Esta Interesado En Comprar</option>
+                <option>Pendiente inspeccion</option>
+                <option>Venta</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Base</label>
+            <select id="fil_base">
+                <option value="">Todas</option>
+                <option>In Bound</option>
+                <option>Chatbot</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="loadData()">Filtrar</button>
+        <button class="btn btn-secondary" onclick="clearFilters()">Limpiar Filtros</button>
+        <button class="btn btn-success" onclick="exportCSV()">Descargar CSV</button>
+    </div>
+
+    <div class="stats-row" id="statsRow">
+        <div class="stat-card"><div class="number" id="st_total">0</div><div class="label">Total Registros</div></div>
+        <div class="stat-card"><div class="number" id="st_proceso">0</div><div class="label">En Proceso</div></div>
+        <div class="stat-card"><div class="number" id="st_nocontesta">0</div><div class="label">No Contesta</div></div>
+        <div class="stat-card"><div class="number" id="st_venta">0</div><div class="label">Ventas</div></div>
+        <div class="stat-card"><div class="number" id="st_vendido">0</div><div class="label">Interesado</div></div>
+    </div>
+
+    <div class="table-card">
+        <div class="table-header">
+            <h3>Registros de Gestión</h3>
+            <button class="btn btn-secondary" onclick="loadData()">Actualizar</button>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th><th>Fecha</th><th>Nombre</th><th>Teléfono</th><th>Documento</th>
+                        <th>Correo</th><th>Placa</th><th>Ciudad</th><th>Valor Póliza</th><th>¿Cotización?</th><th>Medio</th><th>Tipificación</th>
+                        <th>Base</th><th>Agente</th><th>Observación</th><th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    <tr><td colspan="16" class="empty-state">Haz clic en "Filtrar" para cargar los datos</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ============ CONFIGURACIÓN ============ -->
+<div class="panel" id="panel-config">
+    <div class="config-card">
+        <h3>1. Conectar con Google Sheets</h3>
+        <p>Pega aquí la URL de tu Web App de Google Apps Script para conectar la aplicación con tu hoja de cálculo.</p>
+        <div class="config-input-row">
+            <input type="text" id="apiUrl" placeholder="https://script.google.com/macros/s/.../exec">
+            <button class="btn btn-primary" onclick="saveApiUrl()">Guardar</button>
+            <button class="btn btn-secondary" onclick="testConnection()">Probar Conexión</button>
+        </div>
+    </div>
+
+    <div class="config-card">
+        <h3>2. Instrucciones de Configuración</h3>
+        <p><strong>Paso 1:</strong> Crea una nueva hoja de Google Sheets con estos encabezados en la fila 1:</p>
+        <pre>ID | FECHA | NOMBRE | TELEFONO | DOCUMENTO | CORREO | VALOR POLIZA | MEDIO | TIPIFICACION | BASE | AGENTE | OBSERVACION</pre>
+
+        <p><strong>Paso 2:</strong> En Google Sheets, ve a <strong>Extensiones → Apps Script</strong> y pega el siguiente código:</p>
+        <pre id="codeBlock">// ===== CÓDIGO PARA GOOGLE APPS SCRIPT =====
+// Pega esto en Extensiones > Apps Script de tu Google Sheet
+
+const SHEET_NAME = "Hoja1"; // Cambia si tu hoja tiene otro nombre
+
+function doGet(e) {
+  return handleRequest(e);
+}
+
+function doPost(e) {
+  return handleRequest(e);
+}
+
+function handleRequest(e) {
+  const lock = LockService.getScriptLock();
+  lock.tryLock(10000);
+
+  try {
+    const action = e.parameter.action;
+
+    if (action === "ping") {
+      return jsonResponse({ status: "ok", message: "Conexión exitosa" });
+    }
+
+    if (action === "add") {
+      return addRow(e);
+    }
+
+    if (action === "getAll") {
+      return getAllRows(e);
+    }
+
+    if (action === "delete") {
+      return deleteRow(e);
+    }
+
+    return jsonResponse({ status: "error", message: "Acción no reconocida" });
+  } catch (err) {
+    return jsonResponse({ status: "error", message: err.toString() });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function addRow(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const lastRow = sheet.getLastRow();
+  const newId = lastRow > 1 ? Number(sheet.getRange(lastRow, 1).getValue()) + 1 : 1;
+
+  const data = JSON.parse(e.parameter.data);
+  sheet.appendRow([
+    newId,
+    data.fecha,
+    data.nombre,
+    data.telefono,
+    data.documento,
+    data.correo,
+    data.valor,
+    data.medio,
+    data.tipificacion,
+    data.base,
+    data.agente,
+    data.observacion
+  ]);
+
+  return jsonResponse({ status: "ok", id: newId });
+}
+
+function getAllRows(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const rows = [];
+
+  for (let i = 1; i &lt; data.length; i++) {
+    const row = {};
+    headers.forEach((h, j) => { row[h] = data[i][j]; });
+    rows.push(row);
+  }
+
+  return jsonResponse({ status: "ok", data: rows });
+}
+
+function deleteRow(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  const id = Number(e.parameter.id);
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i &lt; data.length; i++) {
+    if (Number(data[i][0]) === id) {
+      sheet.deleteRow(i + 1);
+      return jsonResponse({ status: "ok" });
+    }
+  }
+
+  return jsonResponse({ status: "error", message: "ID no encontrado" });
+}
+
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+
+        <p><strong>Paso 3:</strong> Haz clic en <strong>Implementar → Nueva implementación</strong>. Selecciona tipo <strong>"Aplicación web"</strong>, acceso <strong>"Cualquier persona"</strong>, y haz clic en <strong>Implementar</strong>.</p>
+        <p><strong>Paso 4:</strong> Copia la URL generada y pégala en el campo de arriba.</p>
+        <p><strong>Paso 5:</strong> Haz clic en "Probar Conexión" para verificar.</p>
+    </div>
+
+    <div class="config-card">
+        <h3>3. Actualización diaria automática</h3>
+        <p>Dado que Google Sheets es la base de datos, los datos se actualizan en tiempo real cada vez que un agente guarda un registro. No necesitas hacer nada adicional. Todos los agentes que abran esta aplicación y la conecten a la misma hoja verán los mismos datos.</p>
+        <p>Para respaldar los datos automáticamente cada día, puedes agregar este trigger en Apps Script (menú <strong>Activadores</strong>):</p>
+        <pre>// Agrega esto al mismo Apps Script para respaldo diario
+function backupDaily() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  const today = Utilities.formatDate(new Date(), "America/Bogota", "yyyy-MM-dd");
+  const backup = sheet.copyTo(ss);
+  backup.setName("Respaldo_" + today);
+}</pre>
+        <p>Luego en Apps Script ve a <strong>Activadores (reloj)</strong> → Agrega uno nuevo → Función: <code>backupDaily</code> → Temporizador diario → Hora que prefieras.</p>
+    </div>
+</div>
+
+<!-- Modal confirmación eliminar -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal">
+        <h3>Confirmar Eliminación</h3>
+        <p>¿Estás seguro de que deseas eliminar el registro <strong id="deleteId"></strong>? Esta acción no se puede deshacer.</p>
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancelar</button>
+            <button class="btn btn-danger" onclick="confirmDelete()">Eliminar</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+    // ===== STATE =====
+    let allData = [];
+    let pendingDeleteId = null;
+    let _jsonpCounter = 0;
+
+    // ===== JSONP: método que funciona desde archivos locales (file://) =====
+    function jsonpRequest(params) {
+        return new Promise((resolve, reject) => {
+            const url = getApiUrl();
+            if (!url) { reject(new Error('No hay URL configurada')); return; }
+
+            const callbackName = '_jsonpCb_' + (++_jsonpCounter) + '_' + Date.now();
+            const timeout = setTimeout(() => {
+                delete window[callbackName];
+                if (script.parentNode) script.parentNode.removeChild(script);
+                reject(new Error('Tiempo de espera agotado'));
+            }, 15000);
+
+            window[callbackName] = function(data) {
+                clearTimeout(timeout);
+                delete window[callbackName];
+                if (script.parentNode) script.parentNode.removeChild(script);
+                resolve(data);
+            };
+
+            const qs = Object.keys(params).map(k => k + '=' + encodeURIComponent(params[k])).join('&');
+            const script = document.createElement('script');
+            script.src = url + '?' + qs + '&callback=' + callbackName;
+            script.onerror = function() {
+                clearTimeout(timeout);
+                delete window[callbackName];
+                if (script.parentNode) script.parentNode.removeChild(script);
+                reject(new Error('Error de red'));
+            };
+            document.body.appendChild(script);
+        });
+    }
+
+    // ===== TABS =====
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+            if (tab.dataset.tab === 'dashboard') loadData();
+        });
+    });
+
+    // ===== INIT =====
+    window.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('f_fecha').value = new Date().toISOString().split('T')[0];
+        const saved = localStorage.getItem('apiUrl');
+        if (saved) {
+            document.getElementById('apiUrl').value = saved;
+            testConnection();
+        } else {
+            setConnection(false);
+        }
+    });
+
+    // ===== API =====
+    function getApiUrl() {
+        return localStorage.getItem('apiUrl') || '';
+    }
+
+    function saveApiUrl() {
+        const url = document.getElementById('apiUrl').value.trim();
+        if (!url) return toast('Ingresa una URL válida', 'error');
+        localStorage.setItem('apiUrl', url);
+        toast('URL guardada correctamente', 'success');
+        testConnection();
+    }
+
+    async function testConnection() {
+        const url = getApiUrl();
+        if (!url) { setConnection(false); return; }
+        try {
+            const json = await jsonpRequest({ action: 'ping' });
+            setConnection(json.status === 'ok');
+            if (json.status === 'ok') toast('Conexión exitosa con Google Sheets', 'success');
+            else toast('Error: ' + (json.message || 'Respuesta inesperada'), 'error');
+        } catch (e) {
+            setConnection(false);
+            toast('No se pudo conectar. Revisa la URL y que el script esté implementado correctamente.', 'error');
+        }
+    }
+
+    function setConnection(ok) {
+        document.getElementById('connDot').className = 'dot ' + (ok ? 'ok' : 'err');
+        document.getElementById('connText').textContent = ok ? 'Conectado a Google Sheets' : 'Sin conexión';
+    }
+
+    // ===== VALIDACIÓN DE CAMPOS =====
+    const fieldLabels = {
+        f_fecha: 'Fecha', f_agente: 'Agente', f_nombre: 'Nombre del Cliente',
+        f_telefono: 'Teléfono', f_documento: 'Documento', f_correo: 'Correo',
+        f_placa: 'Placa', f_ciudad: 'Ciudad', f_valor: 'Valor Póliza',
+        f_cotizacion: '¿Realizaste Cotización?', f_medio: 'Medio',
+        f_base: 'Base', f_tipificacion: 'Tipificación', f_observacion: 'Observación'
+    };
+
+    function validateForm() {
+        let missing = [];
+        let firstInvalid = null;
+        Object.keys(fieldLabels).forEach(id => {
+            const el = document.getElementById(id);
+            const val = el.value.trim();
+            if (!val) {
+                missing.push(fieldLabels[id]);
+                el.classList.add('touched');
+                if (!firstInvalid) firstInvalid = el;
+            } else {
+                el.classList.remove('touched');
+            }
+        });
+        if (missing.length > 0) {
+            toast('Faltan campos obligatorios: ' + missing.join(', '), 'error');
+            if (firstInvalid) firstInvalid.focus();
+            return false;
+        }
+        return true;
+    }
+
+    // Quitar resaltado rojo al escribir
+    Object.keys(fieldLabels).forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener('input', () => el.classList.remove('touched'));
+        el.addEventListener('change', () => el.classList.remove('touched'));
+    });
+
+    // ===== FORM SUBMIT =====
+    document.getElementById('mainForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!validateForm()) return;
+        const url = getApiUrl();
+        if (!url) return toast('Configura la URL de Google Sheets primero', 'error');
+
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        document.getElementById('submitText').innerHTML = '<span class="spinner"></span> Guardando...';
+
+        const data = {
+            fecha: document.getElementById('f_fecha').value,
+            nombre: document.getElementById('f_nombre').value.trim(),
+            telefono: document.getElementById('f_telefono').value.trim(),
+            documento: document.getElementById('f_documento').value.trim(),
+            correo: document.getElementById('f_correo').value.trim(),
+            placa: document.getElementById('f_placa').value.trim().toUpperCase(),
+            ciudad: document.getElementById('f_ciudad').value.trim(),
+            valor: document.getElementById('f_valor').value.trim(),
+            cotizacion: document.getElementById('f_cotizacion').value,
+            medio: document.getElementById('f_medio').value,
+            tipificacion: document.getElementById('f_tipificacion').value,
+            base: document.getElementById('f_base').value,
+            agente: document.getElementById('f_agente').value,
+            observacion: document.getElementById('f_observacion').value.trim()
+        };
+
+        try {
+            const json = await jsonpRequest({ action: 'add', data: JSON.stringify(data) });
+            if (json.status === 'ok') {
+                toast('Registro #' + json.id + ' guardado exitosamente', 'success');
+                clearForm();
+            } else {
+                toast('Error: ' + json.message, 'error');
+            }
+        } catch (err) {
+            toast('Error de conexión: ' + err.message, 'error');
+        } finally {
+            btn.disabled = false;
+            document.getElementById('submitText').textContent = 'Guardar Registro';
+        }
+    });
+
+    function clearForm() {
+        document.getElementById('mainForm').reset();
+        document.getElementById('f_fecha').value = new Date().toISOString().split('T')[0];
+    }
+
+    // ===== LOAD DATA & FILTERS =====
+    async function loadData() {
+        const url = getApiUrl();
+        if (!url) return toast('Configura la URL primero en la pestaña Configuración', 'error');
+
+        const tbody = document.getElementById('tableBody');
+        tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:30px;"><span class="spinner" style="border-color:rgba(26,35,126,.2);border-top-color:#1a237e;width:30px;height:30px;"></span></td></tr>';
+
+        try {
+            const json = await jsonpRequest({ action: 'getAll' });
+            if (json.status !== 'ok') { toast('Error al cargar datos', 'error'); return; }
+
+            allData = json.data || [];
+            renderTable();
+        } catch (err) {
+            toast('Error: ' + err.message, 'error');
+            tbody.innerHTML = '<tr><td colspan="16" class="empty-state">Error al cargar datos</td></tr>';
+        }
+    }
+
+    function renderTable() {
+        const desde = document.getElementById('fil_desde').value;
+        const hasta = document.getElementById('fil_hasta').value;
+        const agente = document.getElementById('fil_agente').value;
+        const tipif = document.getElementById('fil_tipificacion').value;
+        const base = document.getElementById('fil_base').value;
+
+        let filtered = allData.filter(r => {
+            if (desde && r.FECHA < desde) return false;
+            if (hasta && r.FECHA > hasta) return false;
+            if (agente && r.AGENTE !== agente) return false;
+            if (tipif && r.TIPIFICACION !== tipif) return false;
+            if (base && r.BASE !== base) return false;
+            return true;
+        });
+
+        // Stats
+        document.getElementById('st_total').textContent = filtered.length;
+        document.getElementById('st_proceso').textContent = filtered.filter(r => r.TIPIFICACION === 'En proceso').length;
+        document.getElementById('st_nocontesta').textContent = filtered.filter(r => r.TIPIFICACION === 'No contesta').length;
+        document.getElementById('st_venta').textContent = filtered.filter(r => r.TIPIFICACION === 'Venta').length;
+        document.getElementById('st_vendido').textContent = filtered.filter(r =>
+            ['Pendiente inspeccion', 'Interesado en otro producto', 'Interesado en SOAT'].includes(r.TIPIFICACION)
+        ).length;
+
+        const tbody = document.getElementById('tableBody');
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="16" class="empty-state">No hay registros para los filtros seleccionados</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(r => {
+            const badgeClass = getBadgeClass(r.TIPIFICACION);
+            return `<tr>
+                <td><strong>${r.ID || ''}</strong></td>
+                <td>${formatDate(r.FECHA)}</td>
+                <td>${r.NOMBRE || ''}</td>
+                <td>${r.TELEFONO || ''}</td>
+                <td>${r.DOCUMENTO || ''}</td>
+                <td>${r.CORREO || ''}</td>
+                <td>${r.PLACA || ''}</td>
+                <td>${r.CIUDAD || ''}</td>
+                <td>${r['VALOR POLIZA'] || ''}</td>
+                <td>${r.COTIZACION || ''}</td>
+                <td>${r.MEDIO || ''}</td>
+                <td><span class="badge ${badgeClass}">${r.TIPIFICACION || ''}</span></td>
+                <td>${r.BASE || ''}</td>
+                <td>${r.AGENTE || ''}</td>
+                <td>${(r.OBSERVACION || '').substring(0, 50)}${(r.OBSERVACION || '').length > 50 ? '...' : ''}</td>
+                <td class="actions"><button class="btn btn-danger" style="padding:5px 12px;font-size:.78rem;" onclick="openDeleteModal(${r.ID})">Eliminar</button></td>
+            </tr>`;
+        }).join('');
+    }
+
+    function getBadgeClass(t) {
+        if (!t) return '';
+        if (['En proceso', 'Pendiente inspeccion', 'Volver A Llamar'].includes(t)) return 'badge-orange';
+        if (['No contesta', 'No contacto - sin datos', 'Cliente cuelga - Llamada caida'].includes(t)) return 'badge-red';
+        if (t === 'Venta') return 'badge-green';
+        if (['Interesado en SOAT', 'Interesado en otro producto', 'Solo Se Encuentra Cotizando'].includes(t)) return 'badge-blue';
+        return 'badge-green';
+    }
+
+    function formatDate(d) {
+        if (!d) return '';
+        if (typeof d === 'string' && d.includes('T')) return d.split('T')[0];
+        return d;
+    }
+
+    function clearFilters() {
+        document.getElementById('fil_desde').value = '';
+        document.getElementById('fil_hasta').value = '';
+        document.getElementById('fil_agente').value = '';
+        document.getElementById('fil_tipificacion').value = '';
+        document.getElementById('fil_base').value = '';
+        renderTable();
+    }
+
+    // ===== DELETE =====
+    function openDeleteModal(id) {
+        pendingDeleteId = id;
+        document.getElementById('deleteId').textContent = '#' + id;
+        document.getElementById('deleteModal').classList.add('open');
+    }
+    function closeDeleteModal() {
+        document.getElementById('deleteModal').classList.remove('open');
+        pendingDeleteId = null;
+    }
+    async function confirmDelete() {
+        if (!pendingDeleteId) return;
+        try {
+            const json = await jsonpRequest({ action: 'delete', id: pendingDeleteId });
+            if (json.status === 'ok') {
+                toast('Registro eliminado', 'success');
+                loadData();
+            } else {
+                toast('Error: ' + json.message, 'error');
+            }
+        } catch (err) {
+            toast('Error: ' + err.message, 'error');
+        }
+        closeDeleteModal();
+    }
+
+    // ===== EXPORT CSV =====
+    function exportCSV() {
+        if (allData.length === 0) return toast('No hay datos para exportar', 'error');
+        const headers = ['ID','FECHA','NOMBRE','TELEFONO','DOCUMENTO','CORREO','PLACA','CIUDAD','VALOR POLIZA','COTIZACION','MEDIO','TIPIFICACION','BASE','AGENTE','OBSERVACION'];
+        let csv = headers.join(',') + '\n';
+        allData.forEach(r => {
+            csv += headers.map(h => '"' + (String(r[h] || '')).replace(/"/g, '""') + '"').join(',') + '\n';
+        });
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'gestion_inbound_' + new Date().toISOString().split('T')[0] + '.csv';
+        link.click();
+        toast('CSV descargado', 'success');
+    }
+
+    // ===== UTILITIES =====
+    function formatCurrency(input) {
+        let val = input.value.replace(/\D/g, '');
+        input.value = val.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    }
+
+    function toast(msg, type) {
+        const el = document.createElement('div');
+        el.className = 'toast toast-' + type;
+        el.innerHTML = (type === 'success' ? '&#10004;' : type === 'error' ? '&#10008;' : 'ℹ') + ' ' + msg;
+        document.getElementById('toastContainer').appendChild(el);
+        setTimeout(() => el.remove(), 4000);
+    }
+</script>
+</body>
+</html>
