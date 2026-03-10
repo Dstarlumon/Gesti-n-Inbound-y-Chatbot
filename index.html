@@ -606,8 +606,10 @@ function backupDaily() {
     });
 
     // ===== API =====
+    const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbysua8tep2KwGQmbfVtX2QAMMXBj477SQ1GYpeFkv09UATvUga3PwErVnb3oIXPJjMgOw/exec';
+
     function getApiUrl() {
-        return localStorage.getItem('apiUrl') || '';
+        return localStorage.getItem('apiUrl') || DEFAULT_API_URL;
     }
 
     function saveApiUrl() {
