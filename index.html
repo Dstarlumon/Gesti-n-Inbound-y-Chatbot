@@ -549,7 +549,25 @@ function backupDaily() {
     let pendingDeleteId = null;
     let _jsonpCounter = 0;
 
-    // ===== JSONP: método que funciona desde archivos locales (file://) =====
+    // ===== COMUNICACIÓN CON GOOGLE APPS SCRIPT =====
+    // Intenta fetch primero (funciona desde https://), si falla usa JSONP (funciona desde file://)
+    async function apiRequest(params) {
+        const url = getApiUrl();
+        if (!url) throw new Error('No hay URL configurada');
+
+        const qs = Object.keys(params).map(k => k + '=' + encodeURIComponent(params[k])).join('&');
+
+        // Intentar con fetch primero
+        try {
+            const res = await fetch(url + '?' + qs, { redirect: 'follow' });
+            const text = await res.text();
+            return JSON.parse(text);
+        } catch(e) {
+            // Si fetch falla (ej: desde file://), usar JSONP como respaldo
+            return jsonpRequest(params);
+        }
+    }
+
     function jsonpRequest(params) {
         return new Promise((resolve, reject) => {
             const url = getApiUrl();
@@ -624,7 +642,7 @@ function backupDaily() {
         const url = getApiUrl();
         if (!url) { setConnection(false); return; }
         try {
-            const json = await jsonpRequest({ action: 'ping' });
+            const json = await apiRequest({ action: 'ping' });
             setConnection(json.status === 'ok');
             if (json.status === 'ok') toast('Conexión exitosa con Google Sheets', 'success');
             else toast('Error: ' + (json.message || 'Respuesta inesperada'), 'error');
@@ -706,7 +724,7 @@ function backupDaily() {
         };
 
         try {
-            const json = await jsonpRequest({ action: 'add', data: JSON.stringify(data) });
+            const json = await apiRequest({ action: 'add', data: JSON.stringify(data) });
             if (json.status === 'ok') {
                 toast('Registro #' + json.id + ' guardado exitosamente', 'success');
                 clearForm();
@@ -735,7 +753,7 @@ function backupDaily() {
         tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:30px;"><span class="spinner" style="border-color:rgba(26,35,126,.2);border-top-color:#1a237e;width:30px;height:30px;"></span></td></tr>';
 
         try {
-            const json = await jsonpRequest({ action: 'getAll' });
+            const json = await apiRequest({ action: 'getAll' });
             if (json.status !== 'ok') { toast('Error al cargar datos', 'error'); return; }
 
             allData = json.data || [];
@@ -837,7 +855,7 @@ function backupDaily() {
     async function confirmDelete() {
         if (!pendingDeleteId) return;
         try {
-            const json = await jsonpRequest({ action: 'delete', id: pendingDeleteId });
+            const json = await apiRequest({ action: 'delete', id: pendingDeleteId });
             if (json.status === 'ok') {
                 toast('Registro eliminado', 'success');
                 loadData();
